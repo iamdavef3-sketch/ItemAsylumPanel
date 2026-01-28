@@ -1,0 +1,366 @@
+local Player = game.Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+local VIM = game:GetService("VirtualInputManager")
+
+local ActiveConnections = {}
+local UI_MainConnection = nil
+local Debounce = {}
+
+local JC_Count = 1
+
+local TheBetterRedMistIA = Instance.new("ScreenGui")
+local MainMenuFrame = Instance.new("Frame")
+local PagesFolder = Instance.new("Folder")
+local TabButtonsFrame = Instance.new("Frame")
+
+local THEME_COLOR = Color3.fromRGB(255, 60, 60)
+local BG_COLOR = Color3.fromRGB(25, 25, 25)
+
+TheBetterRedMistIA.Name = "TheBetterRedMistIA"
+TheBetterRedMistIA.Parent = Player:WaitForChild("PlayerGui")
+TheBetterRedMistIA.ResetOnSpawn = false
+
+MainMenuFrame.Name = "MainMenuFrame"
+MainMenuFrame.Parent = TheBetterRedMistIA
+MainMenuFrame.BackgroundColor3 = BG_COLOR
+MainMenuFrame.BackgroundTransparency = 0.1
+MainMenuFrame.Position = UDim2.new(0.5, -275, 0.5, -175)
+MainMenuFrame.Size = UDim2.new(0, 550, 0, 350)
+MainMenuFrame.ClipsDescendants = true
+Instance.new("UICorner", MainMenuFrame).CornerRadius = UDim.new(0, 10)
+
+local Title = Instance.new("TextLabel", MainMenuFrame)
+Title.Size = UDim2.new(0, 200, 0, 50)
+Title.Position = UDim2.new(0.03, 0, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "STUFF FOR IA"
+Title.TextColor3 = THEME_COLOR
+Title.TextSize = 24
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+TabButtonsFrame.Name = "TabButtonsFrame"
+TabButtonsFrame.Parent = MainMenuFrame
+TabButtonsFrame.Position = UDim2.new(0.4, 0, 0.03, 0)
+TabButtonsFrame.Size = UDim2.new(0.55, 0, 0, 35)
+TabButtonsFrame.BackgroundTransparency = 1
+local TabListLayout = Instance.new("UIListLayout", TabButtonsFrame)
+TabListLayout.FillDirection = Enum.FillDirection.Horizontal
+TabListLayout.Padding = UDim.new(0, 8)
+TabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+
+PagesFolder.Name = "Pages"
+PagesFolder.Parent = MainMenuFrame
+
+local function MakeDraggable(frame)
+	local dragging, dragInput, dragStart, startPos
+	frame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true; dragStart = input.Position; startPos = frame.Position
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+			local delta = input.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+	UIS.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+	end)
+end
+
+local function GetClosestPlayer()
+	local dist, target = math.huge, nil
+	local char = Player.Character
+	local myPos = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.Position
+	if not myPos then return nil end
+
+	for _, p in pairs(game.Players:GetPlayers()) do
+		if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local d = (p.Character.HumanoidRootPart.Position - myPos).Magnitude
+			if d < dist then dist = d; target = p end
+		end
+	end
+	return target
+end
+
+local function GetClosestPlayerToMouse()
+	local Target = nil
+	local MaxDist = math.huge
+	local MousePos = UIS:GetMouseLocation()
+
+	for _, v in pairs(game.Players:GetPlayers()) do
+		if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+			-- Convert 3D world position to 2D screen position
+			local ScreenPos, OnScreen = game.Workspace.CurrentCamera:WorldToViewportPoint(v.Character.HumanoidRootPart.Position)
+
+			if OnScreen then
+				local Magnitude = (Vector2.new(ScreenPos.X, ScreenPos.Y) - MousePos).Magnitude
+				if Magnitude < MaxDist then
+					Target = v
+					MaxDist = Magnitude
+				end
+			end
+		end
+	end
+	return Target
+end
+
+local function DisableFeature(name)
+	if ActiveConnections[name] then
+		if typeof(ActiveConnections[name]) == "RBXScriptConnection" then
+			ActiveConnections[name]:Disconnect()
+		end
+		ActiveConnections[name] = nil
+	end
+end
+
+local function CreatePage(name)
+	local Page = Instance.new("ScrollingFrame", PagesFolder)
+	Page.Name = name
+	Page.Size = UDim2.new(0.94, 0, 0.7, 0)
+	Page.Position = UDim2.new(0.03, 0, 0.16, 0)
+	Page.BackgroundTransparency = 1
+	Page.ScrollBarThickness = 3
+	Page.Visible = false
+	Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	Instance.new("UIListLayout", Page).Padding = UDim.new(0, 6)
+
+	local TabBtn = Instance.new("TextButton", TabButtonsFrame)
+	TabBtn.Size = UDim2.new(0, 85, 1, 0)
+	TabBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	TabBtn.Text = name
+	TabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+	TabBtn.Font = Enum.Font.SourceSansBold
+	Instance.new("UICorner", TabBtn)
+
+	TabBtn.MouseButton1Click:Connect(function()
+		for _, p in pairs(PagesFolder:GetChildren()) do p.Visible = false end
+		Page.Visible = true
+	end)
+	return Page
+end
+
+local function AddToggle(parent, name, onFunc)
+	local Frame = Instance.new("Frame", parent)
+	Frame.Size = UDim2.new(1, -10, 0, 45)
+	Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	Instance.new("UICorner", Frame)
+
+	local Label = Instance.new("TextLabel", Frame)
+	Label.Size = UDim2.new(0.7, 0, 1, 0)
+	Label.Position = UDim2.new(0.05, 0, 0, 0)
+	Label.Text = name
+	Label.TextColor3 = Color3.fromRGB(255, 255, 255); Label.BackgroundTransparency = 1
+	Label.Font = Enum.Font.SourceSans; Label.TextSize = 18; Label.TextXAlignment = 0
+
+	local Btn = Instance.new("TextButton", Frame)
+	Btn.Size = UDim2.new(0, 60, 0.7, 0)
+	Btn.Position = UDim2.new(0.85, 0, 0.15, 0)
+	Btn.BackgroundColor3 = THEME_COLOR
+	Btn.Text = "OFF"
+	Btn.Font = Enum.Font.SourceSansBold
+	Instance.new("UICorner", Btn)
+
+	local enabled = false
+	Btn.MouseButton1Click:Connect(function()
+		enabled = not enabled
+		Btn.Text = enabled and "ON" or "OFF"
+		Btn.BackgroundColor3 = enabled and Color3.fromRGB(60, 255, 60) or THEME_COLOR
+
+		if enabled then
+			ActiveConnections[name] = onFunc()
+		else
+			DisableFeature(name)
+		end
+	end)
+end
+
+local function AddSettingInput(parent, name, placeholder, callback)
+	local Frame = Instance.new("Frame", parent)
+	Frame.Size = UDim2.new(1, -10, 0, 35)
+	Frame.BackgroundTransparency = 1
+
+	local Label = Instance.new("TextLabel", Frame)
+	Label.Size = UDim2.new(0.6, 0, 1, 0)
+	Label.Text = name
+	Label.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+	Label.BackgroundTransparency = 1
+	Label.Font = Enum.Font.SourceSans; Label.TextSize = 16; Label.TextXAlignment = 0
+
+	local Input = Instance.new("TextBox", Frame)
+	Input.Size = UDim2.new(0.25, 0, 0.8, 0)
+	Input.Position = UDim2.new(0.7, 0, 0.1, 0)
+	Input.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	Input.Text = placeholder
+	Input.TextColor3 = Color3.new(1, 1, 1); Input.Font = Enum.Font.SourceSansBold; Input.TextSize = 14
+	Instance.new("UICorner", Input)
+
+	Input.FocusLost:Connect(function()
+		local val = tonumber(Input.Text)
+		if val then callback(val) end
+	end)
+end
+
+local ItemsPage = CreatePage("Items")
+local MiscPage = CreatePage("Misc")
+ItemsPage.Visible = true
+
+AddToggle(ItemsPage, "Bear5Jumpscare", function()
+	return UIS.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+		if input.KeyCode == Enum.KeyCode.E and Player.Character:FindFirstChild(Player.Name:lower().."5") then
+			local target = GetClosestPlayer()
+			if target then
+				task.wait(1.6)
+				for i=1,10 do
+					Player.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 7)
+					task.wait(0.05)
+				end
+			end
+		end
+	end)
+end)
+
+AddToggle(ItemsPage, "DunkNeverMiss", function()
+	return UIS.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 and Player.Character:FindFirstChild("dunk") then
+			local target = GetClosestPlayer()
+			if target and (target.Character.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude < 70 then
+				task.wait(2.5)
+				Player.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 45, 0)
+			end
+		end
+	end)
+end)
+
+AddToggle(ItemsPage, "JustitiaReacher", function()
+	return UIS.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+		local char = Player.Character
+		if char and char:FindFirstChild("justitia") then
+			if input.KeyCode == Enum.KeyCode.R or input.UserInputType == Enum.UserInputType.MouseButton1 then
+				task.wait(input.KeyCode == Enum.KeyCode.R and 0.5 or 0.01)
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					local att, dash, float = Instance.new("Attachment", hrp), Instance.new("LinearVelocity", hrp), Instance.new("VectorForce", hrp)
+					dash.MaxForce, dash.VectorVelocity, dash.Attachment0 = 1000000, hrp.CFrame.LookVector * 65, att
+					float.Force, float.Attachment0 = Vector3.new(0, workspace.Gravity * hrp.AssemblyMass, 0), att
+					Debris:AddItem(dash, 0.3); Debris:AddItem(float, 0.3); Debris:AddItem(att, 0.3)
+				end
+			end
+		end
+	end)
+end)
+
+AddToggle(ItemsPage, "VampirismSuicide (E)", function()
+	return UIS.InputBegan:Connect(function(input, gpe)
+		if gpe or Debounce["Vamp"] then return end
+		local char = Player.Character
+		if input.KeyCode == Enum.KeyCode.E and char:FindFirstChild("vampirism") then
+			local target, hrp = GetClosestPlayer(), char:FindFirstChild("HumanoidRootPart")
+			if target and hrp and (target.Character.HumanoidRootPart.Position - hrp.Position).Magnitude < 15 then
+				Debounce["Vamp"] = true
+				local origin = hrp.CFrame
+				hrp.Anchored = true
+				local descend = TweenService:Create(hrp, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {CFrame = CFrame.new(hrp.Position.X, -500, hrp.Position.Z)})
+				descend:Play()
+				descend.Completed:Connect(function()
+					task.wait(3)
+					local ascend = TweenService:Create(hrp, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {CFrame = origin})
+					ascend:Play()
+					ascend.Completed:Connect(function() hrp.Anchored = false; Debounce["Vamp"] = false end)
+				end)
+			end
+		end
+	end)
+end)
+local JC_Count = 5 
+
+AddToggle(ItemsPage, "Auto Yamato JC (Q) Broken", function()
+	return UIS.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+
+		local char = Player.Character
+		-- Check both Character and Backpack just in case
+		local yamato = char and (char:FindFirstChild("yamato") or Player.Backpack:FindFirstChild("yamato"))
+
+		if input.KeyCode == Enum.KeyCode.Q and yamato then
+			-- Initial R to start the animation
+			VIM:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+			task.wait(0.01)
+			VIM:SendKeyEvent(false, Enum.KeyCode.R, false, game)
+
+			task.spawn(function()
+				-- Execute Perfect JC sequence
+				for i = 1, JC_Count do
+					-- Wait for the animation timing
+					task.wait(1 + math.random(0.35, 0.6))
+
+					VIM:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+					task.wait(0.01)
+					VIM:SendKeyEvent(false, Enum.KeyCode.R, false, game)
+				end
+			end)
+		end
+	end)
+end)
+
+
+AddToggle(ItemsPage, "Intervention Aimbot QuickScope", function()
+	return UIS.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+
+		local char = Player.Character
+		-- Fixed the typo "intenvention" to "intervention"
+		local weapon = char and (char:FindFirstChild("intervention") or Player.Backpack:FindFirstChild("intervention"))
+
+		if input.KeyCode == Enum.KeyCode.E and weapon then
+			local target = GetClosestPlayerToMouse()
+
+			if target and target.Character then
+				task.spawn(function()
+					local startTime = tick()
+					-- Run for exactly 3 seconds
+					while tick() - startTime < 3 do
+						if target.Character and target.Character:FindFirstChild("Head") then
+							-- Aim the camera at the target's head
+							local camera = game.Workspace.CurrentCamera
+							camera.CFrame = CFrame.new(camera.CFrame.Position, target.Character.Head.Position)
+						end
+						task.wait() -- Update every frame
+					end
+				end)
+			end
+		end
+	end)
+end)
+
+
+
+
+local UnloadBtn = Instance.new("TextButton", MainMenuFrame)
+UnloadBtn.Size = UDim2.new(0, 100, 0, 30)
+UnloadBtn.Position = UDim2.new(0.03, 0, 0.88, 0)
+UnloadBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+UnloadBtn.Text = "UNLOAD"
+UnloadBtn.TextColor3 = Color3.new(1,1,1); UnloadBtn.Font = 3
+Instance.new("UICorner", UnloadBtn)
+
+UnloadBtn.MouseButton1Click:Connect(function()
+	for _, conn in pairs(ActiveConnections) do if conn then conn:Disconnect() end end
+	if UI_MainConnection then UI_MainConnection:Disconnect() end
+	TheBetterRedMistIA:Destroy()
+end)
+
+UI_MainConnection = UIS.InputBegan:Connect(function(input, gpe)
+	if not gpe and input.KeyCode == Enum.KeyCode.RightAlt then
+		MainMenuFrame.Visible = not MainMenuFrame.Visible
+	end
+end)
+
+MakeDraggable(MainMenuFrame)
