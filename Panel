@@ -317,7 +317,7 @@ AddToggle(ItemsPage, "Intervention Aimbot QuickScope", function()
 
 		local char = Player.Character
 		-- Fixed the typo "intenvention" to "intervention"
-		local weapon = char and (char:FindFirstChild("intervention")
+		local weapon = (char:FindFirstChild("intervention"))
 
 		if input.KeyCode == Enum.KeyCode.E and weapon then
 			local target = GetClosestPlayerToMouse()
@@ -326,7 +326,7 @@ AddToggle(ItemsPage, "Intervention Aimbot QuickScope", function()
 				task.spawn(function()
 					local startTime = tick()
 					-- Run for exactly 3 seconds
-					while tick() - startTime < 1.5 do
+					while tick() - startTime < 1 do
 						if target.Character and target.Character:FindFirstChild("Head") then
 							-- Aim the camera at the target's head
 							local camera = game.Workspace.CurrentCamera
