@@ -266,7 +266,7 @@ AddToggle(ItemsPage, "VampirismSuicide (E)", function()
 			if target and hrp and (target.Character.HumanoidRootPart.Position - hrp.Position).Magnitude < 15 then
 				Debounce["Vamp"] = true
 				local origin = hrp.CFrame
-				hrp.Anchored = true
+				hrp.Anchored = false
 				local descend = TweenService:Create(hrp, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {CFrame = CFrame.new(hrp.Position.X, -500, hrp.Position.Z)})
 				descend:Play()
 				descend.Completed:Connect(function()
@@ -340,6 +340,38 @@ AddToggle(ItemsPage, "Intervention Aimbot QuickScope", function()
 	end)
 end)
 
+AddToggle(ItemsPage, "YourEternalBackstab (Right Click)", function()
+	return UIS.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+
+		local char = Player.Character
+		-- Ensure the tool check matches the exact name in-game
+		local yer = char and char:FindFirstChild("your eternal reward")
+
+		if input.UserInputType == Enum.UserInputType.MouseButton2 and yer then
+			local target = GetClosestPlayer()
+
+			if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+				local targetHRP = target.Character.HumanoidRootPart
+				local myHRP = char:FindFirstChild("HumanoidRootPart")
+
+				if myHRP and (targetHRP.Position - myHRP.Position).Magnitude < 15 then
+					-- Teleport 3 studs behind the target, facing the same way they are
+					myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 3)
+
+					-- Brief wait to ensure the physics engine registers the position
+					task.wait(0.5)
+
+					-- Click MouseButton1 (Left Click) to stab
+					-- Arguments: X, Y, Button (0 = Left), IsDown, Window, Depth
+					VIM:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+					task.wait(0.01)
+					VIM:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+				end
+			end
+		end
+	end)
+end)
 
 
 
