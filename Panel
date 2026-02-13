@@ -1,3 +1,55 @@
+local plr = game.Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local hum = char:WaitForChild("Humanoid")
+hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+
+local workspace = game.Workspace
+local npcs = workspace:WaitForChild("NPCs")
+local wegadolls = workspace.Area.wegachallenge:WaitForChild("WegaDolls")
+
+local ts = game:GetService("TweenService")
+local moveTI = TweenInfo.new(0.15, Enum.EasingStyle.Linear)
+local evasiveTI = TweenInfo.new(0.25, Enum.EasingStyle.Linear)
+
+local teleporting = false
+local collected = 0
+
+task.spawn(function()
+	while true do
+		if teleporting then continue end
+
+		for _, npc in ipairs(npcs:GetChildren()) do
+			if npc:IsA("Model") and npc.Name ~= "Rorys" then
+				local npcHRP = npc:FindFirstChild("HumanoidRootPart")
+				if npcHRP then
+					local distance = (hrp.Position - npcHRP.Position).Magnitude
+					if distance < 25 then
+						teleporting = true
+						ts:Create(hrp, evasiveTI, {CFrame = hrp.CFrame + Vector3.new(0, 5000, 0)}):Play()
+						task.wait(0.75)
+						hrp.CFrame = CFrame.new(0, 60, 0)
+						teleporting = false
+					end
+				end
+			end
+		end
+	end
+end)
+
+while #wegadolls:GetChildren() > 1 do
+	for _, doll in ipairs(wegadolls:GetChildren()) do
+		if doll:IsA("BasePart") then
+			ts:Create(hrp, moveTI, {CFrame = doll.CFrame}):Play()
+			collected += 1
+			print(collected .. " Dolls Collected")
+			task.wait(moveTI.Time + 0.01)
+		end
+	end
+end
+
+print("Finished")
 local Player = game.Players.LocalPlayer
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
